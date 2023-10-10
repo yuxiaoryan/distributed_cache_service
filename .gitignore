@@ -1,5 +1,5 @@
 go.mod
 go.sum
 cacher_server
-proto/cacher_server_service/*  
-!proto/cacher_server_service/*.proto
+proto/cache_server_service/*  
+!proto/cache_server_service/*.proto
