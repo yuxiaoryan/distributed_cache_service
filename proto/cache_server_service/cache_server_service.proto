@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package cache_server_service;
+option go_package = ".";
+import "google/api/annotations.proto";
+
+// Here is the overall greeting service definition where we define all our endpoints
+service Greeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {
+    option (google.api.http) = {
+      post: "/test"
+      body: "*"
+    };
+  }
+  rpc AddKeyValue (AddKeyValueRequest) returns (AddKeyValueReply) {
+    option (google.api.http) = {
+      post: "/"
+      body: "*"
+    };
+  }
+}
+
+// The request message containing the user's name
+message HelloRequest {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+
+message AddKeyValueRequest{
+  string key = 1;
+  string value = 2;
+}
+
+message AddKeyValueReply {
+  string message = 1;
+}
