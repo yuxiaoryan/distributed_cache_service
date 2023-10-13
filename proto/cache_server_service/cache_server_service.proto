@@ -3,9 +3,10 @@ syntax = "proto3";
 package cache_server_service;
 option go_package = ".";
 import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
 
 // Here is the overall greeting service definition where we define all our endpoints
-service Greeter {
+service CacheServer {
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {
     option (google.api.http) = {
@@ -19,6 +20,11 @@ service Greeter {
       body: "*"
     };
   }
+  rpc GetValueByKey (GetValueRequest) returns (GetValueReply) {
+      option (google.api.http) = {
+          get: "/{key}",
+      };
+    }
 }
 
 // The request message containing the user's name
@@ -38,4 +44,14 @@ message AddKeyValueRequest{
 
 message AddKeyValueReply {
   string message = 1;
+}
+
+message GetValueRequest{
+  string key = 1;
+}
+
+message GetValueReply {
+  string key = 1;
+  string value = 2;
+  string isExist = 3;
 }
