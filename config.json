@@ -1,5 +1,6 @@
 {
     "ip": "127.0.0.1",
     "port_rpc": "${PORT_RPC}",
-    "port_gate": "${PORT_GATE}"
+    "port_gate": "${PORT_GATE}",
+    "all_grpc": "${ALL_RPC}"
 }

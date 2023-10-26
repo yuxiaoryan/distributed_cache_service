@@ -48,6 +48,7 @@ message AddKeyValueReply {
 
 message GetValueRequest{
   string key = 1;
+  int64 interControl = 2;
 }
 
 message GetValueReply {

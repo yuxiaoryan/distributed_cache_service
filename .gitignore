@@ -1,5 +1,6 @@
 go.mod
 go.sum
+*.txt
 cacher_server
 proto/cache_server_service/*  
 !proto/cache_server_service/*.proto
