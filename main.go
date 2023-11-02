@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"bytes"
+	"strings"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -29,9 +30,10 @@ import (
 )
 var Global = "myvalue" // Go全局变量
 type svrConfig struct {
-    IP			string `json:"ip"`
-    RpcPort		string `json:"port_rpc"`
-    GatePort	string `json:"port_gate"`
+    IP				string `json:"ip"`
+    RpcPort			string `json:"port_rpc"`
+    GatePort		string `json:"port_gate"`
+	RpcServerList 	string `json:"all_grpc"`
 }
 
 type server struct{
@@ -40,6 +42,7 @@ type server struct{
 
 
 var kvDict = make(map[string]string)
+var rpcServerList []string
 func NewServer() *server {
 	return &server{}
 }
@@ -51,42 +54,37 @@ func (s *server) SayHello(ctx context.Context, in *servicepb.HelloRequest) (*ser
 }
 
 func (s *server) AddKeyValue(ctx context.Context, in *servicepb.AddKeyValueRequest) (*servicepb.AddKeyValueReply, error) {
-	//试一下unmarsh
-	// in..UnmarshalTo(foo)
-
 	kvDict[in.Key] = in.Value
-    // data, err := json.Marshal(in.Data)
 	fmt.Println("log ... succeed in writing " + kvDict[in.Key] + " into " + in.Key)
 	return &servicepb.AddKeyValueReply{Message: "succeed in writing " + kvDict[in.Key] + " into " + in.Key}, nil
 }
 
 func (s *server) GetValueByKey(ctx context.Context, in *servicepb.GetValueRequest) (*servicepb.GetValueReply, error) {
-	//试一下unmarsh
-	// in..UnmarshalTo(foo)
-	log.Println("log ... get ",kvDict["tasks"]," from ",in.Key)
-
-    // data, err := json.Marshal(in.Data)
-	// msg := &servicepb.GetValueReply{
-	// 	Value: any,
-	// }
 	v, ok := kvDict[in.Key]
-
+	log.Println("log ... get ", v," from ", in.Key, " with interControl:", in.InterControl)
 	isExist := "false"
 	if ok {
 		isExist = "true"
+	}else{
+		if in.InterControl == 0{
+			for i := 0; i < len(rpcServerList); i++ {
+				addr := rpcServerList[i]
+				log.Println(addr)
+				var result = make(map[string]string)
+				funcs.CallGrpcSever(&result, addr, in.Key, "GetValueByKey")
+				log.Println("out:::", result["IsExist"])
+				if result["IsExist"] == "true"{
+					v = result["Value"]
+					isExist = "true"
+					break
+				}
+			}
+		}
 	}
 	return &servicepb.GetValueReply{Key: in.Key, Value:  v, IsExist: isExist} , nil
 }
 
-// func myFilter(ctx context.Context, writer http.ResponseWriter, resp protoreflect.ProtoMessage) error {
-// 	//w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1.1+json")
-// 	// writer.Write([]byte("欢迎访问学院君个人网站?"))
-// 	return nil
-// }
-type myBody struct {
-    Key string `json:"key"`
-    Value string `json:"value"`
-}
+
 
 func setProxyRules(handler http.Handler) http.Handler {
     return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -106,35 +104,15 @@ func setProxyRules(handler http.Handler) http.Handler {
 			m:=httpsnoop.CaptureMetrics(handler,writer,request) //request must be used
 			log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
 		}
-		
-	
-		// write.New(writer, http.StatusTeapot).JSON(&myBody{
-		// 	Key:   "foo",
-		// 	Value: "bar",
-		// })
-
-       
-        // defer func() {
-        //     log.Println(
-        //             rww.String(),
-        //         )
-        // }()
-		
-        // handler.ServeHTTP(rww, request)
-		
-		// if request.Method == "POST" && request.URL.Path == "/"{
-		// 	writer.Write([]byte(responseBody))
-		// }
 		if request.Method == "GET" && funcs.MatchURLPath(request.URL.Path, "/*"){
 			writerFake := httptest.NewRecorder()
 			m:=httpsnoop.CaptureMetrics(handler,writerFake,request) //use a fake response to get the result
 			log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
-			rww := NewResponseWriterWrapper(writerFake)
+			rww := funcs.NewResponseWriterWrapper(writerFake)
 			handler.ServeHTTP(rww, request) //copy the result from the fake response to buf; but it sends an empty request to the grpc server
 			writer.Header()
 			var msgJson map[string]string
-
-			json.Unmarshal([]byte(rww.body.String()), &msgJson)
+			json.Unmarshal([]byte(rww.Body.String()), &msgJson)
 			fmt.Println("GET KEY:",msgJson["key"])
 			fmt.Println("IF  GET:",msgJson["isExist"])
 			fmt.Println("GET VAL:",msgJson["value"])
@@ -174,72 +152,18 @@ func setProxyRules(handler http.Handler) http.Handler {
 				}
 				
 		}
-			
 			// write.New(writer, http.StatusTeapot).Empty()
-			
-			 //write the result extracted from buf into the real response
+			//write the result extracted from buf into the real response
 		}
 		
 		
     })
 }
 
-// ResponseWriterWrapper struct is used to log the response
-type ResponseWriterWrapper struct {
-    w          *http.ResponseWriter
-    body       *bytes.Buffer
-    statusCode *int
-}
-
-// NewResponseWriterWrapper static function creates a wrapper for the http.ResponseWriter
-func NewResponseWriterWrapper(w http.ResponseWriter) ResponseWriterWrapper {
-    var buf bytes.Buffer
-    var statusCode int = 200
-    return ResponseWriterWrapper{
-        w:          &w,
-        body:       &buf,
-        statusCode: &statusCode,
-    }
-}
-
-func (rww ResponseWriterWrapper) Write(buf []byte) (int, error) {
-    rww.body.Write(buf)
-    return (*rww.w).Write([]byte{})
-}
-
-// Header function overwrites the http.ResponseWriter Header() function
-func (rww ResponseWriterWrapper) Header() http.Header {
-    return (*rww.w).Header()
-}
-
-// WriteHeader function overwrites the http.ResponseWriter WriteHeader() function
-func (rww ResponseWriterWrapper) WriteHeader(statusCode int) {
-    (*rww.statusCode) = statusCode
-    (*rww.w).WriteHeader(statusCode)
-}
-
-func (rww ResponseWriterWrapper) String() string {
-    var buf bytes.Buffer
-    buf.WriteString("Response:")
-    buf.WriteString("Headers:")
-    for k, v := range (*rww.w).Header() {
-        buf.WriteString(fmt.Sprintf("%s: %v", k, v))
-    }
-
-    buf.WriteString(fmt.Sprintf(" Status Code: %d", *(rww.statusCode)))
-
-    buf.WriteString("Body")
-	fmt.Println("haha!",rww.body.String())
-    buf.WriteString(rww.body.String())
-    return buf.String()
-}
 
 func main() {
-	funcs.Test()
-
 	// Load ip and ports from config.json
 	cfg := svrConfig{}
-
 	orgData, err := ioutil.ReadFile("config.json")
 	if err != nil {
 		log.Fatalln("Failed to config:", err)
@@ -249,6 +173,14 @@ func main() {
 	err = json.Unmarshal([]byte(data), &cfg)
 	if err != nil {
 		log.Fatalln("Failed to load cfg:", err)
+	}
+
+	rpcServerListTmp := strings.Split(cfg.RpcServerList,",")
+	for i:=0;i<len(rpcServerListTmp);i++{
+		if rpcServerListTmp[i] != cfg.IP + ":" + cfg.RpcPort{
+		// log.Println(rpcServerListTmp[i], cfg.IP + ":" + cfg.RpcPort)
+		rpcServerList = append(rpcServerList, rpcServerListTmp[i])
+		}
 	}
 
 	lis, err := net.Listen("tcp", ":" + cfg.RpcPort)
