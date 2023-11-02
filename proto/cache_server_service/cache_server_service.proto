@@ -25,6 +25,11 @@ service CacheServer {
           get: "/{key}",
       };
     }
+  rpc DeleteValueByKey (DeleteValueRequest) returns (DeleteValueReply) {
+      option (google.api.http) = {
+          delete: "/{key}",
+      };
+  }
 }
 
 // The request message containing the user's name
@@ -55,4 +60,13 @@ message GetValueReply {
   string key = 1;
   string value = 2;
   string isExist = 3;
+}
+
+message DeleteValueRequest{
+  string key = 1;
+  int64 interControl = 2;
+}
+
+message DeleteValueReply {
+  int64 num = 1;
 }

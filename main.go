@@ -59,6 +59,7 @@ func (s *server) AddKeyValue(ctx context.Context, in *servicepb.AddKeyValueReque
 	return &servicepb.AddKeyValueReply{Message: "succeed in writing " + kvDict[in.Key] + " into " + in.Key}, nil
 }
 
+
 func (s *server) GetValueByKey(ctx context.Context, in *servicepb.GetValueRequest) (*servicepb.GetValueReply, error) {
 	v, ok := kvDict[in.Key]
 	log.Println("log ... get ", v," from ", in.Key, " with interControl:", in.InterControl)
@@ -84,6 +85,31 @@ func (s *server) GetValueByKey(ctx context.Context, in *servicepb.GetValueReques
 	return &servicepb.GetValueReply{Key: in.Key, Value:  v, IsExist: isExist} , nil
 }
 
+func (s *server) DeleteValueByKey(ctx context.Context, in *servicepb.DeleteValueRequest) (*servicepb.DeleteValueReply, error) {
+	_, ok := kvDict[in.Key]
+	// log.Println("log ... delete ", v," from ", in.Key, " with interControl:", in.InterControl)
+	num := 0
+	if ok {
+		delete(kvDict, in.Key)
+		num = 1
+	}else{
+		if in.InterControl == 0{
+			// for i := 0; i < len(rpcServerList); i++ {
+			// 	addr := rpcServerList[i]
+			// 	log.Println(addr)
+			// 	var result = make(map[string]string)
+			// 	funcs.CallGrpcSever(&result, addr, in.Key, "GetValueByKey")
+			// 	log.Println("out:::", result["IsExist"])
+			// 	if result["IsExist"] == "true"{
+			// 		v = result["Value"]
+			// 		isExist = "true"
+			// 		break
+			// 	}
+			// }
+		}
+	}
+	return &servicepb.DeleteValueReply{Num: int64(num)} , nil
+}
 
 
 func setProxyRules(handler http.Handler) http.Handler {
@@ -155,8 +181,11 @@ func setProxyRules(handler http.Handler) http.Handler {
 			// write.New(writer, http.StatusTeapot).Empty()
 			//write the result extracted from buf into the real response
 		}
-		
-		
+		if request.Method == "DELETE" && funcs.MatchURLPath(request.URL.Path, "/*"){
+			m:=httpsnoop.CaptureMetrics(handler,writer,request) //use a fake response to get the result
+			log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
+		}
+
     })
 }
 
