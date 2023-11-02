@@ -132,8 +132,8 @@ func setProxyRules(handler http.Handler) http.Handler {
 		}
 		if request.Method == "GET" && funcs.MatchURLPath(request.URL.Path, "/*"){
 			writerFake := httptest.NewRecorder()
-			m:=httpsnoop.CaptureMetrics(handler,writerFake,request) //use a fake response to get the result
-			log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
+			// m:=httpsnoop.CaptureMetrics(handler,writerFake,request) //use a fake response to get the result
+			// log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
 			rww := funcs.NewResponseWriterWrapper(writerFake)
 			handler.ServeHTTP(rww, request) //copy the result from the fake response to buf; but it sends an empty request to the grpc server
 			writer.Header()
