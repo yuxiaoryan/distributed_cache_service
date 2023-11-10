@@ -90,24 +90,24 @@ func (s *server) DeleteValueByKey(ctx context.Context, in *servicepb.DeleteValue
 	_, ok := kvDict[in.Key]
 	// log.Println("log ... delete ", v," from ", in.Key, " with interControl:", in.InterControl)
 	num := int64(0)
+	log.Println("log ... delete ", in.Key, " with interControl:", in.InterControl)
 	if ok {
 		delete(kvDict, in.Key)
 		num = int64(1)
-	}else{
-		if in.InterControl == 0{
-			for i := 0; i < len(rpcServerList); i++ {
-				addr := rpcServerList[i]
-				var result = make(map[string]string)
-				funcs.CallGrpcSever(&result, addr, in.Key, "DeleteValueByKey")
-				log.Println("out:::", result["num"])
-				num_, _ := strconv.ParseInt(result["num"],10,64)
+	}
+	if in.InterControl == 0{
+		for i := 0; i < len(rpcServerList); i++ {
+			addr := rpcServerList[i]
+			var result = make(map[string]string)
+			funcs.CallGrpcSever(&result, addr, in.Key, "DeleteValueByKey")
+			log.Println("out:::", result["num"])
+			num_, _ := strconv.ParseInt(result["num"],10,64)
+			if num == 0{
 				num = num_
-				if num > 0 {
-					break
-				}
 			}
 		}
 	}
+	
 	return &servicepb.DeleteValueReply{Num: num} , nil
 }
 
