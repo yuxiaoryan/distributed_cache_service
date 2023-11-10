@@ -5,6 +5,7 @@ import (
 	"log"
 	"bytes"
 	"strings"
+	"strconv"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -88,27 +89,26 @@ func (s *server) GetValueByKey(ctx context.Context, in *servicepb.GetValueReques
 func (s *server) DeleteValueByKey(ctx context.Context, in *servicepb.DeleteValueRequest) (*servicepb.DeleteValueReply, error) {
 	_, ok := kvDict[in.Key]
 	// log.Println("log ... delete ", v," from ", in.Key, " with interControl:", in.InterControl)
-	num := 0
+	num := int64(0)
 	if ok {
 		delete(kvDict, in.Key)
-		num = 1
+		num = int64(1)
 	}else{
 		if in.InterControl == 0{
-			// for i := 0; i < len(rpcServerList); i++ {
-			// 	addr := rpcServerList[i]
-			// 	log.Println(addr)
-			// 	var result = make(map[string]string)
-			// 	funcs.CallGrpcSever(&result, addr, in.Key, "GetValueByKey")
-			// 	log.Println("out:::", result["IsExist"])
-			// 	if result["IsExist"] == "true"{
-			// 		v = result["Value"]
-			// 		isExist = "true"
-			// 		break
-			// 	}
-			// }
+			for i := 0; i < len(rpcServerList); i++ {
+				addr := rpcServerList[i]
+				var result = make(map[string]string)
+				funcs.CallGrpcSever(&result, addr, in.Key, "DeleteValueByKey")
+				log.Println("out:::", result["num"])
+				num_, _ := strconv.ParseInt(result["num"],10,64)
+				num = num_
+				if num > 0 {
+					break
+				}
+			}
 		}
 	}
-	return &servicepb.DeleteValueReply{Num: int64(num)} , nil
+	return &servicepb.DeleteValueReply{Num: num} , nil
 }
 
 
@@ -135,7 +135,7 @@ func setProxyRules(handler http.Handler) http.Handler {
 			// m:=httpsnoop.CaptureMetrics(handler,writerFake,request) //use a fake response to get the result
 			// log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
 			rww := funcs.NewResponseWriterWrapper(writerFake)
-			handler.ServeHTTP(rww, request) //copy the result from the fake response to buf; but it sends an empty request to the grpc server
+			handler.ServeHTTP(rww, request) //copy the result from the fake response to buf
 			writer.Header()
 			var msgJson map[string]string
 			json.Unmarshal([]byte(rww.Body.String()), &msgJson)
@@ -182,10 +182,15 @@ func setProxyRules(handler http.Handler) http.Handler {
 			//write the result extracted from buf into the real response
 		}
 		if request.Method == "DELETE" && funcs.MatchURLPath(request.URL.Path, "/*"){
-			m:=httpsnoop.CaptureMetrics(handler,writer,request) //use a fake response to get the result
-			log.Printf("http[%d]-- %s -- %s\n",m.Code,m.Duration,request.URL.Path)
+			writerFake := httptest.NewRecorder();
+			rww := funcs.NewResponseWriterWrapper(writerFake)
+			handler.ServeHTTP(rww, request)
+			writer.WriteHeader(200)
+			var msgJson map[string]string
+			json.Unmarshal([]byte(rww.Body.String()), &msgJson)
+			res := msgJson["num"]
+			write.New(writer, http.StatusTeapot).Text(res)
 		}
-
     })
 }
 

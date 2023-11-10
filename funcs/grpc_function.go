@@ -24,13 +24,21 @@ func CallGrpcSever(result *map[string]string, addr string, key string, funcName 
 		r, err := c.GetValueByKey(ctx, &servicepb.GetValueRequest{Key: key, InterControl: 1})
 		
 		if err != nil {
-			fmt.Println("can not greet to: ",addr)
+			fmt.Println("can not connect to: ",addr)
 		} else {
 			if r.IsExist == "true"{
 				(*result)["Value"] = r.Value
 				(*result)["IsExist"] = "true"
 			}
 		}
-	}
-	fmt.Println("你好,",(*result)["Value"], (*result)["IsExist"])
+	}	
+	if funcName == "DeleteValueByKey"{
+		(*result)["num"] = ""
+		r, err := c.DeleteValueByKey(ctx, &servicepb.DeleteValueRequest{Key: key, InterControl: 1})
+		if err != nil {
+			fmt.Println("can not connect to: ",addr)
+		} else {
+			(*result)["num"] = Any2String(r.Num)
+		}
+	}	
 }
